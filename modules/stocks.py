@@ -68,10 +68,10 @@ def view():
         display_cols = ['symbol', 'quantity', 'avg_cost', 'current_price', 'market_value', 'profit_loss', 'roi']
         st.dataframe(df[display_cols].style.format({
             "quantity": "{:.2f}",
-            "avg_cost": "{:.2f}",
-            "current_price": "{:.2f}",
-            "market_value": "{:.2f}",
-            "profit_loss": "{:.2f}",
+            "avg_cost": utils.format_currency,
+            "current_price": utils.format_currency,
+            "market_value": utils.format_currency,
+            "profit_loss": utils.format_currency,
             "roi": "{:.2f}%"
         }), use_container_width=True)
         

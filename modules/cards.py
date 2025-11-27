@@ -25,7 +25,7 @@ def view():
         if not card_usage.empty:
             st.bar_chart(card_usage.set_index('payment_method'))
             
-            st.dataframe(card_usage.style.format({"amount": "{:.2f}"}), use_container_width=True)
+            st.dataframe(card_usage.style.format({"amount": utils.format_currency}), use_container_width=True)
         else:
             st.info("No credit card usage found.")
             
@@ -35,7 +35,7 @@ def view():
         
         card_txs = expenses[expenses['payment_method'] == selected_card]
         if not card_txs.empty:
-            st.dataframe(card_txs[['date', 'category', 'amount', 'description']].style.format({"amount": "{:.2f}"}), use_container_width=True)
+            st.dataframe(card_txs[['date', 'category', 'amount', 'description']].style.format({"amount": utils.format_currency}), use_container_width=True)
             st.metric(label=f"Total {selected_card} Usage", value=utils.format_currency(card_txs['amount'].sum()))
         else:
             st.info(f"No transactions for {selected_card}")

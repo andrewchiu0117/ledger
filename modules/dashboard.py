@@ -35,17 +35,11 @@ def view():
     # Stock Value
     stock_value = 0
     if not df_stocks.empty:
-        # We need current prices for accurate asset value
-        # For dashboard speed, we might want to cache this or just use last known
-        # For now, we'll re-calculate quickly or use buy price if fetch fails
-        # To avoid slow dashboard, let's just use cost basis + simple estimate or just cost if we want speed
-        # But user wants "Total Assets", so let's try to get value.
-        # We can reuse the logic from stocks.py but maybe simplified.
-        # For now, let's just sum the cost basis to be safe and fast, 
-        # or if we want to be fancy, we call the price fetcher (might be slow).
-        # Let's sum cost for now and add a note.
         stock_value = (df_stocks['buy_price'] * df_stocks['quantity']).sum() 
-        # Ideally we'd fetch prices here too, but let's keep it simple for V1.
+    
+    # Account Balances (Liquid Assets)
+    accounts_df = db.get_account_balances()
+    liquid_assets = accounts_df['balance'].sum() if not accounts_df.empty else 0
     
     # Budget
     budget = db.get_budget(current_month_str)
@@ -54,7 +48,7 @@ def view():
     
     # Top Metrics
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Assets (Est)", utils.format_currency(total_income - total_expenses + stock_value)) # Simplified asset calc
+    col1.metric("Total Assets", utils.format_currency(liquid_assets + stock_value))
     col2.metric("Monthly Expenses", utils.format_currency(monthly_expenses), delta=utils.format_currency(budget - monthly_expenses))
     col3.metric("Monthly Budget", utils.format_currency(budget))
     col4.metric("Stock Cost Basis", utils.format_currency(stock_value))
