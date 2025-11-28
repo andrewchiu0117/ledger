@@ -2,6 +2,14 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
+# Import Google Sheets module
+try:
+    from modules import sheets
+    USE_GOOGLE_SHEETS = False
+except ImportError:
+    USE_GOOGLE_SHEETS = False
+    print("Warning: Google Sheets module not available, falling back to SQLite")
+
 DB_FILE = "money.db"
 
 def init_db():
@@ -148,6 +156,13 @@ def delete_transaction(tx_id):
     conn.close()
 
 def get_transactions(limit=50):
+    if USE_GOOGLE_SHEETS:
+        df = sheets.get_transactions_sheet()
+        if not df.empty:
+            df = df.sort_values('date', ascending=False).head(limit)
+        return df
+    
+    # Fallback to SQLite
     conn = get_connection()
     query = """
         SELECT t.*, a.name as account_name 
@@ -160,6 +175,13 @@ def get_transactions(limit=50):
     return df
 
 def get_all_transactions():
+    if USE_GOOGLE_SHEETS:
+        df = sheets.get_transactions_sheet()
+        if not df.empty:
+            df = df.sort_values('date', ascending=False)
+        return df
+    
+    # Fallback to SQLite
     conn = get_connection()
     query = """
         SELECT t.*, a.name as account_name 
@@ -179,6 +201,15 @@ def set_budget(month, amount):
     conn.close()
 
 def get_budget(month):
+    if USE_GOOGLE_SHEETS:
+        df = sheets.get_budgets_sheet()
+        if not df.empty and 'month' in df.columns and 'amount' in df.columns:
+            budget_row = df[df['month'] == month]
+            if not budget_row.empty:
+                return float(budget_row.iloc[0]['amount'])
+        return 0
+    
+    # Fallback to SQLite
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT amount FROM budgets WHERE month = ?", (month,))
@@ -196,6 +227,10 @@ def add_stock(symbol, buy_date, buy_price, quantity, broker_fee, transaction_fee
     conn.close()
 
 def get_stocks():
+    if USE_GOOGLE_SHEETS:
+        return sheets.get_stocks_sheet()
+    
+    # Fallback to SQLite
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM stocks WHERE status = 'Held'", conn)
     conn.close()
@@ -217,6 +252,10 @@ def add_account(name, type, initial_balance):
         conn.close()
 
 def get_accounts():
+    if USE_GOOGLE_SHEETS:
+        return sheets.get_accounts_sheet()
+    
+    # Fallback to SQLite
     conn = get_connection()
     df = pd.read_sql_query("SELECT * FROM accounts", conn)
     conn.close()
@@ -230,6 +269,42 @@ def delete_account(account_id):
     conn.close()
 
 def get_account_balances():
+    if USE_GOOGLE_SHEETS:
+        # Get accounts from Google Sheets
+        accounts_df = sheets.get_accounts_sheet()
+        
+        if accounts_df.empty:
+            return pd.DataFrame(columns=['name', 'type', 'initial_balance', 'balance'])
+        
+        # Get transactions from Google Sheets
+        df_tx = sheets.get_transactions_sheet()
+        
+        # Calculate balances
+        balances = []
+        for _, account in accounts_df.iterrows():
+            balance = account.get('initial_balance', 0) if 'initial_balance' in account else 0
+            
+            if not df_tx.empty and 'account_id' in df_tx.columns:
+                # Filter transactions for this account
+                account_txs = df_tx[df_tx['account_id'] == account['id']]
+                if not account_txs.empty:
+                    income = account_txs[account_txs['type'] == 'Income']['amount'].sum() if 'type' in account_txs.columns else 0
+                    expenses = account_txs[account_txs['type'] == 'Expense']['amount'].sum() if 'type' in account_txs.columns else 0
+                    balance += (income - expenses)
+            elif not df_tx.empty and 'account_name' in df_tx.columns:
+                # Fallback: match by account name
+                account_txs = df_tx[df_tx['account_name'] == account['name']]
+                if not account_txs.empty:
+                    income = account_txs[account_txs['type'] == 'Income']['amount'].sum() if 'type' in account_txs.columns else 0
+                    expenses = account_txs[account_txs['type'] == 'Expense']['amount'].sum() if 'type' in account_txs.columns else 0
+                    balance += (income - expenses)
+            
+            balances.append(balance)
+        
+        accounts_df['balance'] = balances
+        return accounts_df
+    
+    # Fallback to SQLite
     conn = get_connection()
     
     # Get accounts
@@ -293,7 +368,7 @@ def add_category(name, type):
         conn.close()
 
 def get_categories(filter_type=None):
-    """Get categories from the database.
+    """Get categories from the database or Google Sheets.
     
     Parameters
     ----------
@@ -305,6 +380,16 @@ def get_categories(filter_type=None):
     pandas.DataFrame
         DataFrame with category data
     """
+    if USE_GOOGLE_SHEETS:
+        df = sheets.get_categories_sheet()
+        if not df.empty and filter_type:
+            # Filter by type
+            df = df[(df['type'] == filter_type) | (df['type'] == 'Both')]
+        if not df.empty:
+            df = df.sort_values('name')
+        return df
+    
+    # Fallback to SQLite
     conn = get_connection()
     if filter_type:
         query = "SELECT * FROM categories WHERE type = ? OR type = 'Both' ORDER BY name"

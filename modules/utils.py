@@ -24,13 +24,15 @@ def get_categories(filter_type=None):
 
 
 PAYMENT_METHODS = [
-    "Cash", "Credit Card", "Go Card", "Cube Card", "iLeo Card", "Line Bank", "Richart", "Debit Card", "Bank Transfer"
+    "現金", "信用卡", "Go Card", "Cube Card", "iLeo Card", "Line Bank", "Richart", "金融卡", "銀行轉帳"
 ]
 
 def format_currency(amount):
-    if amount == int(amount):
-        return f"NT${int(amount):,}"
-    return f"NT${amount:,.2f}"
+    # if amount is float or int, return the formatted currency
+    if isinstance(amount, float) or isinstance(amount, int):
+        return f"NT${amount:,.2f}"
+    # if amount is NaN, return 0
+    return "0"
 
 def load_css(file_name):
     with open(file_name) as f:
